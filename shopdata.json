@@ -1,0 +1,54 @@
+{
+    "Gun": [
+        {
+            "ID": "gun.pistol",
+            "rebuy": false,
+            "name": "Gun",
+            "price": 500,
+            "img": "image/item.gun.pistol.png"
+        },
+        {
+            "ID": "gun.shotgun",
+            "rebuy": false,
+            "name": "Shotgun",
+            "price": 1000,
+            "img": "image/item.gun.shotgun.png"
+        },
+        {
+            "ID": "gun.rifle",
+            "rebuy": false,
+            "name": "Rifle",
+            "price": 4500,
+            "img": "image/item.gun.rifle.png"
+        }
+    ],
+
+    "Projectile": [
+        {
+            "ID": "projectile.bomb",
+            "rebuy": true,
+            "name": "Bomb",
+            "price": 1000,
+            "img": "image/item.projectile.bomb.png"
+        },
+        {
+            "ID": "projectile.spikebomb",
+            "rebuy": true,
+            "name": "Spike Bomb",
+            "price": 2000,
+            "img": "image/item.projectile.spikebomb.png"
+        }
+    ],
+
+    "Armor": [
+        {
+            "ID": "boot.dash",
+            "rebuy": false,
+            "name": "Dash",
+            "price": 2000,
+            "img": "image/item.boot.dash.png"
+        }
+    ],
+
+    "Powerup": []
+}

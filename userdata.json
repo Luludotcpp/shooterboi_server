@@ -1,0 +1,98 @@
+{
+    "users": [
+        {
+            "username": "user",
+            "password": "passuser",
+            "session": "cpRQnyS0Z8Zx4F_g",
+            "data": {
+                "money": 220,
+                "items": [
+                    {
+                        "ID": "gun.pistol",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "projectile.bomb",
+                        "amount": 206
+                    },
+                    {
+                        "ID": "boot.dash",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "gun.shotgun",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "projectile.spikebomb",
+                        "amount": 13
+                    },
+                    {
+                        "ID": "gun.rifle",
+                        "amount": 1
+                    }
+                ]
+            }
+        },
+        {
+            "username": "crazy",
+            "password": "imcrazy",
+            "session": "v7vqRfrDufPVtG3U",
+            "data": {
+                "money": 200,
+                "items": [
+                    {
+                        "ID": "gun.pistol",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "gun.shotgun",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "gun.rifle",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "projectile.bomb",
+                        "amount": 0
+                    }
+                ]
+            }
+        },
+        {
+            "username": "howtoeatpoop",
+            "password": "idkman",
+            "session": "hh20BLJu4nQXvS7A",
+            "data": {
+                "money": 926222,
+                "items": [
+                    {
+                        "ID": "gun.shotgun",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "gun.pistol",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "gun.rifle",
+                        "amount": 1
+                    },
+                    {
+                        "ID": "projectile.spikebomb",
+                        "amount": 985
+                    },
+                    {
+                        "ID": "projectile.bomb",
+                        "amount": 1039
+                    },
+                    {
+                        "ID": "boot.dash",
+                        "amount": 1
+                    }
+                ]
+            }
+        }
+    ]
+}
