@@ -1,16 +1,10 @@
 const Server = require("ws").Server;
 const {readFileSync, writeFileSync} = require("fs");
-
-const hostname = "localhost";
-const port = 5505;
-
-const wss = new Server({port:port, host:hostname});
-
-console.log(`Server running on - ${hostname}:${port}`);
+const { app } = require("./client");
 
 let log = {users:[]};
 try{
-    log = JSON.parse(readFileSync("userdata.json", "utf8"));
+    log = JSON.parse(readFileSync(__dirname + "/userdata.json", "utf8"));
 }catch(e)
 {
     console.log("Couldn't read user data because:\n"+e+"\nProceeding anyway!");
@@ -19,11 +13,50 @@ try{
 let shopdata = {};
 try
 {
-    shopdata = JSON.parse(readFileSync("shopdata.json", "utf8"));
+    shopdata = JSON.parse(readFileSync(__dirname + "/shopdata.json", "utf8"));
 }catch(e)
 {
     console.log("Couldn't read shop data because:\n" + e + "\n Proceeding anyway!");
 }
+
+let config = {
+    server_address: "localhost:5050",
+    client_address: "localhost:42069",
+    kill_reward: 50,
+    newbie_money: 100,
+    simulated_latency: 0,
+    max_lobby_capacity: 20,
+    map_index_function: "Math.floor( Math.random() * mapCount )",
+    max_lobby_count: 1024,
+    allow_private_lobby: true,
+    delete_empty_private_lobby: true,
+    delete_empty_public_lobby: false,
+    server_code_injection: false
+};
+
+
+try
+{
+    config = JSON.parse(readFileSync(__dirname + "/properties.json"));
+}catch(e)
+{
+    console.log("Couldn't read properties.json because:\n" + e + "\n Proceeding anyway! [with debug configurations]");
+    saveConfig();
+}
+
+
+const hostname = config.server_address.split(':')[0];
+const port = config.server_address.split(':')[1];
+
+const wss = new Server({port:port, host:hostname});
+console.log(`Server running on - ${hostname}:${port}`);
+
+app.listen(config.client_address.split(':')[1], config.client_address.split(':')[0], ()=>{
+    console.log(`Client-side server running on - http://${config.client_address}/home.html`);
+});
+
+
+let simulatedLatency = config.simulated_latency ?? 0; // in ms
 
 function GetCode()
 {
@@ -75,7 +108,7 @@ function JoinLobby(code, socket, username, id)
     }));
 }
 
-function RemoveEmptyLobbies()
+function RemoveEmptyLobbies(private = false)
 {
     let rem = [];
 
@@ -83,7 +116,8 @@ function RemoveEmptyLobbies()
     {
         if(lobbies[i].sockets.length == 0)
         {
-            rem.push(i);
+            if(private == !lobbies[i].public)
+                rem.push(i);
         }
     }
 
@@ -102,6 +136,15 @@ class Lobby
         this.code = GetCode();
         this.name = this.code;
         this.public = true;
+        try
+        {
+            this.mapIndex = eval(config.map_index_function) ?? Math.floor(Math.random() * mapCount);
+        }
+        catch (e)
+        {
+            console.log("\n  Woops! It seems there was an error evaluating 'map_index_function' property!\n  Nerdy error : " + e + "\n  falling back to default function!\n");
+            this.mapIndex = IntRandom(0, mapCount);
+        }
     }
 
     AddUser(socket, username, id)
@@ -118,7 +161,8 @@ class Lobby
         socket.send(JSON.stringify({
             type: "join",
             status: true,
-            username: username
+            username: username,
+            mapIndex: this.mapIndex
         }));
 
         socket.SID = id;
@@ -199,16 +243,18 @@ function GetPublicLobbyList()
 }
 
 const lobbies = [];
-for(let i = 0; i < 0; i ++)
-{
-    lobbies.push(new Lobby());
-}
+const mapCount = 2;
+
+setInterval(()=>{
+    if(config.delete_empty_private_lobby) RemoveEmptyLobbies(true);
+    if(config.delete_empty_public_lobby)  RemoveEmptyLobbies(false);
+}, 1000);
 
 
 wss.on("connection", socket=>{
     socket.SID = "UNKNOWN";
 
-    socket.on("message", msg=>{
+    socket.on("message", msg_=>setTimeout((msg)=>{
         let data = {};
         try{
             data = JSON.parse(msg);
@@ -299,20 +345,46 @@ wss.on("connection", socket=>{
         }
         else if(data.type == "create lobby")
         {
+            if(lobbies.length >= config.max_lobby_capacity)
+            {
+                socket.send(JSON.stringify({
+                    type: "create lobby",
+                    status: false,
+                    reason: "Maximum lobby limit reached: " + config.max_lobby_capacity
+                }));
+                return;
+            }
+            else if(!data.public && config.allow_private_lobby)
+            {
+                socket.send(JSON.stringify({
+                    type: "create lobby",
+                    status: false,
+                    reason: "Creation of private lobbies is not allowed"
+                }));
+                return;
+            }
+
             const lobby = new Lobby();
-            lobby.maxPlayers = data.maxPlayers;
+            lobby.maxPlayers = Math.min(data.maxPlayers, config.max_lobby_capacity);
             lobby.name = data.name;
             lobby.public = data.public;
             lobbies.push(lobby);
 
             socket.send(JSON.stringify({
                 type: "create lobby",
-                code: lobby.code
+                code: lobby.code,
+                status: true
             }));
         }
         else if(data.type == "chat" && data.message.length != 0)
         {
             if(!ValidateJoinedSocket(socket)) return;
+
+            if(data.message[0] == "/")
+            {
+                execCommand(socket, data.message.substr(1));
+                return;
+            }
 
             socket.lobby.Broadcast({
                 type : "message",
@@ -338,7 +410,7 @@ wss.on("connection", socket=>{
             socket.lobby.Broadcast({
                 type: "create particle",
                 particle: data.particle,
-                data: data.data
+                data: data.data,
             });
         }
         else if(data.type == "damage")
@@ -348,7 +420,7 @@ wss.on("connection", socket=>{
         else if(data.type == "killed" && socket.username != data.killer)
         {
             sendKilledPacket(data.killer);
-            addMoney(data.killer, 20);
+            addMoney(data.killer, config.kill_reward);
         }
         else if(data.type == "account.create")
         {
@@ -431,7 +503,8 @@ wss.on("connection", socket=>{
                 // Buy the "new" item
                 log["users"][i].data.items.push({
                     ID: item.ID,
-                    amount: 1
+                    amount: 1,
+                    equipped: false,
                 });
 
                 log["users"][i].data.money -= item.price;
@@ -445,6 +518,64 @@ wss.on("connection", socket=>{
 
                 break;
             }
+        }
+        else if(data.type == "equip item")
+        {
+            let user = null;
+
+            for(let i = 0; i < log["users"].length; i ++)
+            {
+                if(log["users"][i].session != data.session) continue;
+                user = log["users"][i];
+            }
+
+            if(!user)
+            {
+                socket.send(JSON.stringify({
+                    type: "equip item",
+                    status: false,
+                    reason: "Invalid session, please login again."
+                }));
+                return;
+            }
+
+            user.data.inventory[data.itemID.split('.')[0]] = data.itemID;
+            saveLog();
+
+            socket.send(JSON.stringify({
+                type: "equip item",
+                status: true,
+                itemID: data.itemID
+            }));
+        }
+        else if(data.type == "unequip item")
+        {
+            let user = null;
+
+            for(let i = 0; i < log["users"].length; i ++)
+            {
+                if(log["users"][i].session != data.session) continue;
+                user = log["users"][i];
+            }
+
+            if(!user)
+            {
+                socket.send(JSON.stringify({
+                    type: "unequip item",
+                    status: false,
+                    reason: "Invalid session, please login again."
+                }));
+                return;
+            }
+
+            user.data.inventory[data.itemType] = null;
+            saveLog();
+
+            socket.send(JSON.stringify({
+                type: "unequip item",
+                status: true,
+                itemType: data.itemType
+            }));
         }
         else if(data.type == "set amount")
         {
@@ -463,7 +594,7 @@ wss.on("connection", socket=>{
                 break;
             }
         }
-    });
+    }, simulatedLatency, msg_));
 
     socket.on("close", ()=>
     {
@@ -471,8 +602,6 @@ wss.on("connection", socket=>{
 
         console.log(socket.username + " disconnected.");
         socket.lobby.Disconnect(socket);
-
-        // RemoveEmptyLobbies();
     });
 });
 
@@ -482,6 +611,67 @@ wss.broadcast = (msg)=>
     wss.clients.forEach(client=>{
         client.send(str);
     });
+}
+
+function execCommand(socket, command)
+{
+    console.log(`${socket.username} executed "${command}"`);
+
+    const attributes = command.split(" ");
+
+    if(attributes[0] == "s")
+    {
+        if(!config.server_code_injection)
+        {
+            socket.send(JSON.stringify(
+                {
+                    type: "message",
+                    from: "SERVER",
+                    message: "Server-side code injection is disabled!"
+                }
+            ));
+            
+            return;
+        }
+
+        let output = "";
+        try{    
+            output = eval(...(attributes.splice(1).join(" ")));
+        }
+        catch (e)
+        {
+            socket.send(JSON.stringify(
+                {
+                    type: "message",
+                    from: "SERVER",
+                    message: "Error: " + e
+                }
+            ));
+            return;
+        }
+
+        if(output == undefined) return;
+
+        try{
+            socket.send(JSON.stringify(
+                {
+                    type: "message",
+                    from: "SERVER",
+                    message: output
+                }
+            ));
+        }
+        catch(e)
+        {
+            socket.send(JSON.stringify(
+                {
+                    type: "message",
+                    from: "SERVER",
+                    message: "Cannot send output"
+                }
+            ));
+        }
+    }
 }
 
 function addMoney(username, amount)
@@ -547,11 +737,19 @@ function user_signup(username, password, socket)
         password: password,
         session: GetID(),
         data: {
-            money: 100,
+            money: config.newbie_money,
+            inventory: {
+                gun: "gun.pistol",
+                projectile: null,
+                helmet: null,
+                chestplate: null,
+                legging: null,
+                boot: null
+            },
             items: [
                 {
-                    "ID": "gun.shotgun",
-                    "amount": 1
+                    ID: "gun.pistol",
+                    amount: 1
                 },
             ]
         }
@@ -609,7 +807,12 @@ function user_login(username, password, socket)
 
 function saveLog()
 {
-    writeFileSync("userdata.json", JSON.stringify(log, undefined, 4));
+    writeFileSync(__dirname + "/userdata.json", JSON.stringify(log, undefined, 4));
+}
+
+function saveConfig()
+{
+    writeFileSync(__dirname + "/properties.json", JSON.stringify(config, undefined, 4));
 }
 
 function GetID()
@@ -667,4 +870,11 @@ function GetItem(itemID)
     
     console.log("Couldn't find item with ID: " + itemID);
     return {ID:"null", "rebuy":false, name:"null", price:0, img: "image/null"};
+}
+
+
+// min inclusive, max exclusive
+function IntRandom(min, max)
+{
+    return Math.floor(Math.random() * (max - min)) + min
 }
