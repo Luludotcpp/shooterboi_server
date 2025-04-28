@@ -6,4 +6,4 @@
 * **userdata.json** contains the database for storing accounts details <kbd>passwords aren't encrypted, no need to thank me.</kbd>
 * **README.md** contains what you're reading right now.
 
-## PLAY THE GAME AT [HERE](https://shooterboi.netlify.app/home)
+## PLAY THE GAME AT [HERE](https://shooterboi.netlify.app)
